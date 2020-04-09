@@ -14,5 +14,4 @@ bool charFSM(char rChar);
 
 // TODO: Define any constants that are local to homework.c using #define
 
-
 #endif /* HOMEWORK4_H_ */

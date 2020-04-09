@@ -3,6 +3,7 @@
 
 int main(void)
 {
+    unsigned int count;
     char rChar;
     char *response = "\n\n\r2534 is the best course in the curriculum!\r\n\n";
 
@@ -15,8 +16,26 @@ int main(void)
     //       To begin, configure the UART for 9600 baud, 8-bit payload (LSB first), no parity, 1 stop bit.
 
 
-    // TODO: Make sure Tx AND Rx pins of EUSCI_A0 work for UART and not as regular GPIO pins.
+    eUSCI_UART_ConfigV1 uartConfig =
+    {
+        EUSCI_A_UART_CLOCKSOURCE_SMCLK,
+        19,
+        8,
+        0,
+        EUSCI_A_UART_NO_PARITY,
+        EUSCI_A_UART_LSB_FIRST,
+        EUSCI_A_UART_ONE_STOP_BIT,
+        EUSCI_A_UART_MODE,
+        EUSCI_A_UART_OVERSAMPLING_BAUDRATE_GENERATION,
+        EUSCI_A_UART_8_BIT_LEN
+    };
 
+
+    // TODO: Make sure Tx AND Rx pins of EUSCI_A0 work for UART and not as regular GPIO pins.
+    GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_P1, GPIO_PIN2, GPIO_PRIMARY_MODULE_FUNCTION);
+    GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P1, GPIO_PIN3, GPIO_PRIMARY_MODULE_FUNCTION);
+    UART_initModule(EUSCI_A0_BASE, &uartConfig);
+    UART_enableModule(EUSCI_A0_BASE);
 
     // TODO: Initialize EUSCI_A0
 
@@ -29,10 +48,27 @@ int main(void)
         // TODO: Check the receive interrupt flag to see if a received character is available.
         //       Return 0xFF if no character is available.
 
-
+        while (UART_getInterruptStatus(EUSCI_A0_BASE,EUSCI_A_UART_TRANSMIT_INTERRUPT_FLAG)==0)
+        {
+            rChar = 0xFF;
+        }
         // TODO: If an actual character was received, echo the character to the terminal AND use it to update the FSM.
         //       Check the transmit interrupt flag prior to transmitting the character.
 
+        if (UART_getInterruptStatus(EUSCI_A0_BASE,EUSCI_A_UART_TRANSMIT_INTERRUPT_FLAG))
+        {
+            rChar = UART_receiveData(EUSCI_A0_BASE);
+            UART_transmitData(EUSCI_A0_BASE, rChar);
+            if (rChar == '2')
+               if (charFSM(rChar))
+              {
+                   for(count = 0 ; count < 48 ; count++ )
+                   {
+                       UART_transmitData(EUSCI_A0_BASE, response[count]);
+                   }
+
+              }
+        }
 
 
         // TODO: If the FSM indicates a successful string entry, transmit the response string.
@@ -52,7 +88,43 @@ void initBoard()
 bool charFSM(char rChar)
 {
     bool finished = false;
+    unsigned int state = 0;
+    bool loop = 1;
+
+    while (loop)
+    {
+        while (UART_getInterruptStatus(EUSCI_A0_BASE,EUSCI_A_UART_TRANSMIT_INTERRUPT_FLAG)==0)
+        {
+            rChar = 0xFF;
+        }
 
 
+        if (UART_getInterruptStatus(EUSCI_A0_BASE,EUSCI_A_UART_TRANSMIT_INTERRUPT_FLAG))
+        {
+            rChar = UART_receiveData(EUSCI_A0_BASE);
+            UART_transmitData(EUSCI_A0_BASE, rChar);
+            if (rChar == '5' && state == 0)
+            {
+                state = 1;
+                loop = 1;
+            }
+            else if (rChar == '3' && state == 1)
+            {
+                state = 2;
+                loop = 1;
+            }
+            else if (rChar == '4' && state == 2)
+            {
+                loop = 0;
+                finished = true;
+            }
+            else if (rChar == '2')
+            {
+                return charFSM(rChar);
+            }
+            else
+                loop = 0;
+        }
+    }
     return finished;
 }
